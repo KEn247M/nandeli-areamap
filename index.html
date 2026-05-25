@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>なんデリ 配達エリアマップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --paper:#edf0f0; --card:#ffffff; --ink:#1c2527; --sub:#637072;
+    --line:#dde3e2; --accent:#00a3b4; --accent-soft:#00a3b416;
+    --grey:#aeb7b6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--paper);color:var(--ink);
+    font-family:'Noto Sans JP',sans-serif;-webkit-font-smoothing:antialiased}
+  body{padding:22px 16px 60px;max-width:1080px;margin:0 auto}
+  .mono{font-family:'DM Mono',monospace}
+  header{margin-bottom:18px}
+  /* ---- brand ---- */
+  .brand{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .logo{display:flex;flex-direction:column;line-height:1}
+  .logo-jp{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:900;
+    font-size:30px;color:var(--accent);letter-spacing:.01em}
+  .logo-en{font-family:'DM Mono',monospace;font-size:8.5px;color:var(--grey);
+    letter-spacing:.32em;margin-top:5px;text-transform:uppercase}
+  .brand-div{width:1px;height:36px;background:var(--line)}
+  h1{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:700;
+    font-size:17px;letter-spacing:.03em;color:var(--ink)}
+  .addr{color:var(--sub);font-size:12.5px;margin-top:10px;letter-spacing:.02em}
+  .addr b{color:var(--ink);font-weight:500}
+  .grid{display:grid;grid-template-columns:1fr;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+  .pad{padding:18px}
+  /* ---- control ---- */
+  .radlabel{display:flex;align-items:baseline;justify-content:space-between}
+  .radlabel span{font-size:12px;color:var(--sub);letter-spacing:.08em}
+  .radval{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:900;
+    font-size:38px;line-height:1;color:var(--accent)}
+  .radval small{font-size:15px;font-weight:500;color:var(--sub);margin-left:3px}
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;margin:20px 0 6px;
+    background:linear-gradient(var(--accent),var(--accent)) no-repeat,var(--line);
+    background-size:50% 100%;border-radius:3px;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;
+    border-radius:50%;background:var(--accent);border:3px solid var(--card);
+    box-shadow:0 1px 4px #0003;cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;
+    background:var(--accent);border:3px solid var(--card);cursor:pointer}
+  .ticks{display:flex;justify-content:space-between;font-size:10px;
+    color:var(--grey);font-family:'DM Mono',monospace}
+  .quick{display:flex;gap:7px;margin-top:16px;flex-wrap:wrap}
+  .quick button{flex:1;min-width:54px;padding:8px 4px;border:1px solid var(--line);
+    background:var(--card);border-radius:7px;font-family:'DM Mono',monospace;
+    font-size:13px;color:var(--sub);cursor:pointer;transition:.15s}
+  .quick button:hover{border-color:var(--accent);color:var(--accent)}
+  .quick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .stats{display:flex;gap:0;margin-top:18px;border-top:1px solid var(--line);
+    padding-top:16px}
+  .stat{flex:1;text-align:center}
+  .stat+.stat{border-left:1px solid var(--line)}
+  .stat .n{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:900;font-size:26px}
+  .stat .k{font-size:10.5px;color:var(--sub);letter-spacing:.06em;margin-top:2px}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:16px}
+  .actions button{padding:11px 6px;border-radius:8px;
+    border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+    font-family:'Noto Sans JP',sans-serif;font-size:11.5px;font-weight:500;
+    cursor:pointer;transition:.15s;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .actions button.wide{grid-column:1/-1}
+  .actions button.ghost{background:transparent;color:var(--ink)}
+  .actions button:hover{opacity:.82}
+  .actions button.done{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* ---- map ---- */
+  .maphead{display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:6px}
+  .maphead h2,.listhead h2{font-family:'Zen Kaku Gothic New',sans-serif;
+    font-weight:700;font-size:13px;letter-spacing:.04em}
+  .maphead .leg{font-size:10.5px;color:var(--sub)}
+  .leg i{display:inline-block;width:8px;height:8px;border-radius:50%;
+    margin:0 3px 0 9px;vertical-align:middle}
+  .mapctl{display:flex;align-items:center;gap:10px}
+  .lbtog{display:flex;align-items:center;gap:4px;font-size:10.5px;
+    color:var(--sub);cursor:pointer;user-select:none}
+  .lbtog input{accent-color:var(--accent);cursor:pointer;margin:0}
+  #map{height:580px;border-radius:8px;overflow:hidden}
+  .map-name-tip{font-family:'Noto Sans JP',sans-serif;font-size:10px;
+    background:#1c2527;color:#fff;border:none;padding:2px 5px;border-radius:4px}
+  .home-icon div{width:14px;height:14px;background:#1c2527;border-radius:50%;
+    border:3px solid #fff;box-shadow:0 0 0 2px #1c2527}
+  /* ---- list ---- */
+  .listhead{display:flex;justify-content:space-between;align-items:baseline;
+    padding:16px 18px 10px}
+  .listhead .cnt{font-size:11px;color:var(--sub);font-family:'DM Mono',monospace}
+  .listwrap{max-height:430px;overflow-y:auto;padding:0 18px 16px}
+  .cityblock{margin-top:8px}
+  .cityname{display:flex;justify-content:space-between;align-items:baseline;
+    position:sticky;top:0;background:var(--card);padding:8px 0 5px;
+    border-bottom:1.5px solid var(--ink)}
+  .cityname b{font-family:'Zen Kaku Gothic New',sans-serif;font-size:13px;font-weight:700}
+  .cityname span{font-size:10.5px;color:var(--sub);font-family:'DM Mono',monospace}
+  .row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:baseline;
+    padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .row .nm{font-weight:500}
+  .row .zp{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent)}
+  .row .ds{font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);
+    min-width:46px;text-align:right}
+  .empty{padding:40px 10px;text-align:center;color:var(--sub);font-size:12.5px}
+  .note{margin-top:16px;background:var(--card);border:1px solid var(--line);
+    border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;
+    font-size:11.5px;color:var(--sub);line-height:1.7}
+  .note b{color:var(--ink);font-weight:700}
+  footer{margin-top:14px;font-size:11px;color:var(--sub);line-height:1.7}
+  footer code{font-family:'DM Mono',monospace;background:#0000000c;padding:1px 4px;
+    border-radius:3px}
+  /* ---- addr input ---- */
+  .addr-set{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .addrset-label{font-size:11.5px;color:var(--sub);letter-spacing:.06em;margin-bottom:7px}
+  .addr-input-row{display:flex;gap:6px}
+  .addr-input-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:7px;
+    padding:8px 10px;font-family:'Noto Sans JP',sans-serif;font-size:12px;
+    background:var(--card);color:var(--ink);outline:none;transition:.12s}
+  .addr-input-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #00a3b418}
+  .addr-input-row button{padding:8px 13px;border:1px solid var(--ink);border-radius:7px;
+    background:var(--ink);color:var(--paper);font-family:'Noto Sans JP',sans-serif;
+    font-size:12px;cursor:pointer;white-space:nowrap;transition:.12s}
+  .addr-input-row button:hover{opacity:.8}
+  .addr-input-row button:disabled{opacity:.45;cursor:default}
+  .addr-status{font-size:10.5px;margin-top:5px;min-height:14px;color:var(--sub)}
+  .addr-status.ok{color:var(--accent)}
+  .addr-status.err{color:#d94f4f}
+  /* ---- directional sliders ---- */
+  .dir-sliders{margin:10px 0 14px}
+  .dir-row{display:grid;grid-template-columns:2em 1fr 4.5em;align-items:center;gap:8px;margin-bottom:6px}
+  .dir-row label{font-size:10.5px;color:var(--sub);font-family:'DM Mono',monospace;text-align:right}
+  .dir-row .dv{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--accent);text-align:right}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">
+      <span class="logo-jp">なんデリ</span>
+      <span class="logo-en">Anything Delivery</span>
+    </div>
+    <div class="brand-div"></div>
+    <h1>配達エリアマップ</h1>
+  </div>
+  <p class="addr">配達拠点 <b>沖縄県宜野湾市普天間2-12-1</b> ／ 拠点からの直線距離ベース</p>
+</header>
+
+<div class="grid">
+  <!-- MAP -->
+  <div class="card pad">
+    <div class="maphead">
+      <h2>エリアマップ</h2>
+      <div class="mapctl">
+        <label class="lbtog"><input type="checkbox" id="lbtoggle" checked>地名表示</label>
+        <span class="leg"><i style="background:var(--accent)"></i>圏内<i style="background:var(--grey)"></i>圏外</span>
+      </div>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- CONTROL -->
+  <div class="card pad">
+    <!-- 拠点住所設定 -->
+    <div class="addr-set">
+      <div class="addrset-label">配達拠点住所</div>
+      <div class="addr-input-row">
+        <input type="text" id="addr-input" placeholder="例：沖縄県宜野湾市普天間2-12-1" value="沖縄県宜野湾市普天間2-12-1">
+        <button id="addr-btn">設定</button>
+      </div>
+      <div class="addr-status" id="addr-status"></div>
+    </div>
+    <!-- 方向別エリア設定 -->
+    <div class="radlabel" style="margin-bottom:4px"><span>配達エリア設定</span><span class="mono" id="incity"></span></div>
+    <div class="dir-sliders">
+      <div class="dir-row"><label>北</label><input type="range" id="sl-north" min="0.5" max="15" step="0.5" value="5"><span class="dv" id="v-north">5.0km</span></div>
+      <div class="dir-row"><label>南</label><input type="range" id="sl-south" min="0.5" max="15" step="0.5" value="5"><span class="dv" id="v-south">5.0km</span></div>
+      <div class="dir-row"><label>東</label><input type="range" id="sl-east"  min="0.5" max="15" step="0.5" value="5"><span class="dv" id="v-east">5.0km</span></div>
+      <div class="dir-row"><label>西</label><input type="range" id="sl-west"  min="0.5" max="15" step="0.5" value="5"><span class="dv" id="v-west">5.0km</span></div>
+    </div>
+    <div class="quick" id="quick"></div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-area">0</div><div class="k">対象地名</div></div>
+      <div class="stat"><div class="n" id="s-city">0</div><div class="k">市町村</div></div>
+      <div class="stat"><div class="n mono" id="s-far">0</div><div class="k">最遠 km</div></div>
+    </div>
+    <div class="actions">
+      <button id="cp-zip">郵便番号をコピー</button>
+      <button id="cp-list" class="ghost">地名リストをコピー</button>
+      <button id="dl-csv" class="ghost wide">CSVダウンロード</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div class="card" style="margin-top:16px">
+  <div class="listhead">
+    <h2>圏内の地名・郵便番号</h2>
+    <span class="cnt" id="listcnt"></span>
+  </div>
+  <div class="listwrap" id="list"></div>
+</div>
+
+<div class="note">
+  <b>データ範囲</b> — 宜野湾市・浦添市・西原町・北中城村・中城村・北谷町・沖縄市・嘉手納町・読谷村・うるま市の全町域を収録（2025年5月時点、Geolonia v2 + 日本郵便データ）。
+</div>
+
+<footer>
+  距離は各町域の中心点（全丁目の代表点の平均）から配達拠点までの直線距離。実際の配達は道路距離・橋・基地などで前後し、境界付近（半径±0.5km）の地域はエリアが一部だけ重なる場合があります。<br>
+  郵便番号コピーは改行区切り（7桁ハイフンなし）。CSVは <code>市町村,地名,郵便番号,郵便番号7桁,直線距離km</code> 形式。出典：日本郵便 郵便番号データ／町域座標 geolonia。
+</footer>
+
+<script>
+/* 普天間2-12-1 を原点とした直線距離データ（Geolonia v2 + 日本郵便 2025-05 生成） */
+const DATA = [{"city":"宜野湾市","name":"普天間","zip":"901-2202","dist":0.28,"dx":0.063,"dy":0.27},{"city":"宜野湾市","name":"新城","zip":"901-2201","dist":0.59,"dx":-0.408,"dy":-0.422},{"city":"宜野湾市","name":"野嵩","zip":"901-2203","dist":0.63,"dx":0.478,"dy":-0.411},{"city":"宜野湾市","name":"喜友名","zip":"901-2222","dist":1.31,"dx":-1.282,"dy":-0.294},{"city":"宜野湾市","name":"上原","zip":"901-2204","dist":1.37,"dx":-0.001,"dy":-1.371},{"city":"北中城村","name":"安谷屋","zip":"901-2316","dist":1.42,"dx":1.212,"dy":0.743},{"city":"北谷町","name":"北前","zip":"904-0117","dist":1.54,"dx":-1.123,"dy":1.054},{"city":"中城村","name":"登又","zip":"901-2421","dist":1.67,"dx":1.462,"dy":-0.801},{"city":"宜野湾市","name":"赤道","zip":"901-2205","dist":1.81,"dx":-0.439,"dy":-1.757},{"city":"中城村","name":"新垣","zip":"901-2422","dist":1.91,"dx":0.877,"dy":-1.696},{"city":"北中城村","name":"瑞慶覧","zip":"901-2317","dist":1.93,"dx":0.561,"dy":1.841},{"city":"宜野湾市","name":"伊佐","zip":"901-2221","dist":2,"dx":-1.998,"dy":-0.088},{"city":"北谷町","name":"大村","zip":"904-0107","dist":2.02,"dx":-0.366,"dy":1.988},{"city":"北谷町","name":"北谷","zip":"904-0116","dist":2.11,"dx":-1.196,"dy":1.738},{"city":"北中城村","name":"荻道","zip":"901-2315","dist":2.18,"dx":2.144,"dy":0.38},{"city":"北中城村","name":"喜舎場","zip":"901-2311","dist":2.26,"dx":1.66,"dy":1.535},{"city":"宜野湾市","name":"神山","zip":"901-2207","dist":2.35,"dx":-1.276,"dy":-1.976},{"city":"宜野湾市","name":"愛知","zip":"901-2206","dist":2.42,"dx":-0.617,"dy":-2.332},{"city":"北中城村","name":"大城","zip":"901-2314","dist":2.46,"dx":2.462,"dy":0.076},{"city":"中城村","name":"北上原","zip":"901-2423","dist":2.5,"dx":0.392,"dy":-2.467},{"city":"北谷町","name":"玉上","zip":"904-0106","dist":2.67,"dx":0.411,"dy":2.633},{"city":"中城村","name":"屋宜","zip":"901-2405","dist":2.77,"dx":1.766,"dy":-2.127},{"city":"中城村","name":"添石","zip":"901-2404","dist":2.86,"dx":2.282,"dy":-1.726},{"city":"中城村","name":"伊舎堂","zip":"901-2403","dist":2.87,"dx":2.529,"dy":-1.364},{"city":"北中城村","name":"仲順","zip":"901-2303","dist":2.92,"dx":2.406,"dy":1.657},{"city":"宜野湾市","name":"大山","zip":"901-2223","dist":2.96,"dx":-2.802,"dy":-0.973},{"city":"北中城村","name":"屋宜原","zip":"901-2304","dist":2.96,"dx":1.403,"dy":2.608},{"city":"中城村","name":"当間","zip":"901-2406","dist":3.18,"dx":1.474,"dy":-2.816},{"city":"宜野湾市","name":"長田","zip":"901-2212","dist":3.19,"dx":-1.001,"dy":-3.028},{"city":"北中城村","name":"熱田","zip":"901-2313","dist":3.19,"dx":3.173,"dy":0.32},{"city":"北谷町","name":"吉原","zip":"904-0105","dist":3.23,"dx":-0.018,"dy":3.224},{"city":"宜野湾市","name":"宜野湾","zip":"901-2211","dist":3.26,"dx":-1.841,"dy":-2.686},{"city":"北中城村","name":"和仁屋","zip":"901-2312","dist":3.28,"dx":3.079,"dy":1.128},{"city":"北中城村","name":"ライカム","zip":"901-2306","dist":3.34,"dx":2.075,"dy":2.616},{"city":"北谷町","name":"桃原","zip":"904-0104","dist":3.46,"dx":0.291,"dy":3.443},{"city":"北谷町","name":"桑江","zip":"904-0103","dist":3.47,"dx":-0.948,"dy":3.333},{"city":"中城村","name":"安里","zip":"901-2407","dist":3.48,"dx":1.184,"dy":-3.271},{"city":"北谷町","name":"美浜","zip":"904-0115","dist":3.5,"dx":-1.721,"dy":3.043},{"city":"北中城村","name":"渡口","zip":"901-2302","dist":3.57,"dx":2.952,"dy":2.001},{"city":"沖縄市","name":"南桃原","zip":"904-0035","dist":3.68,"dx":0.648,"dy":3.619},{"city":"中城村","name":"泊","zip":"901-2402","dist":3.72,"dx":3.378,"dy":-1.564},{"city":"中城村","name":"久場","zip":"901-2401","dist":3.76,"dx":3.704,"dy":-0.683},{"city":"北中城村","name":"比嘉","zip":"901-2305","dist":3.77,"dx":2.239,"dy":3.032},{"city":"宜野湾市","name":"佐真下","zip":"901-2216","dist":3.78,"dx":-2.698,"dy":-2.644},{"city":"中城村","name":"奥間","zip":"901-2412","dist":3.81,"dx":0.889,"dy":-3.693},{"city":"宜野湾市","name":"志真志","zip":"901-2213","dist":3.82,"dx":-1.239,"dy":-3.603},{"city":"沖縄市","name":"山里","zip":"904-0033","dist":3.83,"dx":1.461,"dy":3.537},{"city":"沖縄市","name":"久保田","zip":"904-0023","dist":4.14,"dx":2.005,"dy":3.617},{"city":"宜野湾市","name":"真志喜","zip":"901-2224","dist":4.21,"dx":-3.89,"dy":-1.625},{"city":"北中城村","name":"島袋","zip":"901-2301","dist":4.25,"dx":2.561,"dy":3.393},{"city":"中城村","name":"南上原","zip":"901-2424","dist":4.29,"dx":-0.415,"dy":-4.266},{"city":"宜野湾市","name":"我如古","zip":"901-2214","dist":4.34,"dx":-2.283,"dy":-3.682},{"city":"北谷町","name":"伊平","zip":"904-0102","dist":4.34,"dx":-1.557,"dy":4.041},{"city":"沖縄市","name":"山内","zip":"904-0034","dist":4.37,"dx":0.884,"dy":4.271},{"city":"北谷町","name":"港","zip":"904-0114","dist":4.42,"dx":-2.459,"dy":3.664},{"city":"沖縄市","name":"与儀","zip":"904-2174","dist":4.42,"dx":3.728,"dy":2.387},{"city":"西原町","name":"千原","zip":"903-0129","dist":4.47,"dx":-1.277,"dy":-4.277},{"city":"宜野湾市","name":"真栄原","zip":"901-2215","dist":4.49,"dx":-3.14,"dy":-3.206},{"city":"宜野湾市","name":"大謝名","zip":"901-2225","dist":4.67,"dx":-3.923,"dy":-2.543},{"city":"中城村","name":"津覇","zip":"901-2413","dist":4.7,"dx":0.675,"dy":-4.64},{"city":"沖縄市","name":"諸見里","zip":"904-0032","dist":4.71,"dx":1.54,"dy":4.446},{"city":"北谷町","name":"上勢頭","zip":"904-0101","dist":4.82,"dx":-0.437,"dy":4.793},{"city":"西原町","name":"森川","zip":"903-0128","dist":4.84,"dx":-1.87,"dy":-4.456},{"city":"沖縄市","name":"園田","zip":"904-0022","dist":4.89,"dx":2.248,"dy":4.333},{"city":"宜野湾市","name":"宇地泊","zip":"901-2227","dist":4.92,"dx":-4.548,"dy":-1.887},{"city":"北中城村","name":"美崎","zip":"901-2321","dist":4.94,"dx":4.639,"dy":1.696},{"city":"北谷町","name":"宮城","zip":"904-0113","dist":5.18,"dx":-2.87,"dy":4.31},{"city":"浦添市","name":"西原","zip":"901-2101","dist":5.25,"dx":-3.031,"dy":-4.284},{"city":"宜野湾市","name":"嘉数","zip":"901-2226","dist":5.31,"dx":-4.056,"dy":-3.429},{"city":"北谷町","name":"浜川","zip":"904-0112","dist":5.32,"dx":-2.091,"dy":4.88},{"city":"沖縄市","name":"上地","zip":"904-0031","dist":5.33,"dx":1.932,"dy":4.956},{"city":"沖縄市","name":"胡屋","zip":"904-0021","dist":5.34,"dx":2.909,"dy":4.471},{"city":"沖縄市","name":"比屋根","zip":"904-2173","dist":5.37,"dx":4.592,"dy":2.791},{"city":"西原町","name":"棚原","zip":"903-0126","dist":5.42,"dx":-2.025,"dy":-5.023},{"city":"中城村","name":"伊集","zip":"901-2417","dist":5.43,"dx":-0.29,"dy":-5.411},{"city":"西原町","name":"上原","zip":"903-0125","dist":5.46,"dx":-1.155,"dy":-5.328},{"city":"中城村","name":"北浜","zip":"901-2414","dist":5.5,"dx":1.024,"dy":-5.398},{"city":"中城村","name":"和宇慶","zip":"901-2416","dist":5.5,"dx":0.371,"dy":-5.473},{"city":"沖縄市","name":"仲宗根町","zip":"904-0014","dist":5.75,"dx":2.853,"dy":4.983},{"city":"西原町","name":"徳佐田","zip":"903-0127","dist":5.8,"dx":-2.779,"dy":-5.08},{"city":"沖縄市","name":"高原","zip":"904-2171","dist":5.86,"dx":4.513,"dy":3.732},{"city":"北谷町","name":"砂辺","zip":"904-0111","dist":5.88,"dx":-2.562,"dy":5.285},{"city":"浦添市","name":"牧港","zip":"901-2131","dist":5.91,"dx":-5.22,"dy":-2.773},{"city":"沖縄市","name":"室川","zip":"904-0013","dist":5.92,"dx":3.211,"dy":4.972},{"city":"沖縄市","name":"安慶田","zip":"904-0012","dist":5.92,"dx":3.611,"dy":4.689},{"city":"浦添市","name":"当山","zip":"901-2104","dist":6.03,"dx":-4.198,"dy":-4.321},{"city":"沖縄市","name":"中央","zip":"904-0004","dist":6.07,"dx":2.468,"dy":5.532},{"city":"中城村","name":"南浜","zip":"901-2415","dist":6.17,"dx":1.031,"dy":-6.076},{"city":"西原町","name":"内間","zip":"903-0121","dist":6.25,"dx":-0.814,"dy":-6.189},{"city":"西原町","name":"掛保久","zip":"903-0101","dist":6.35,"dx":-0.324,"dy":-6.333},{"city":"沖縄市","name":"照屋","zip":"904-0011","dist":6.35,"dx":4.048,"dy":4.886},{"city":"沖縄市","name":"潮乃森","zip":"904-2175","dist":6.41,"dx":6.256,"dy":1.446},{"city":"沖縄市","name":"大里","zip":"904-2163","dist":6.43,"dx":4.802,"dy":4.279},{"city":"沖縄市","name":"住吉","zip":"904-0003","dist":6.44,"dx":3.26,"dy":5.553},{"city":"浦添市","name":"港川","zip":"901-2134","dist":6.55,"dx":-5.954,"dy":-2.743},{"city":"西原町","name":"小橋川","zip":"903-0122","dist":6.55,"dx":-1.172,"dy":-6.438},{"city":"西原町","name":"翁長","zip":"903-0117","dist":6.59,"dx":-2.328,"dy":-6.158},{"city":"浦添市","name":"前田","zip":"901-2102","dist":6.65,"dx":-3.895,"dy":-5.389},{"city":"浦添市","name":"伊祖","zip":"901-2132","dist":6.66,"dx":-5.459,"dy":-3.815},{"city":"沖縄市","name":"嘉間良","zip":"904-0005","dist":6.66,"dx":3.025,"dy":5.924},{"city":"西原町","name":"呉屋","zip":"903-0124","dist":6.73,"dx":-1.907,"dy":-6.442},{"city":"浦添市","name":"仲間","zip":"901-2103","dist":6.74,"dx":-4.841,"dy":-4.69},{"city":"西原町","name":"津花波","zip":"903-0123","dist":6.74,"dx":-1.489,"dy":-6.558},{"city":"沖縄市","name":"泡瀬","zip":"904-2172","dist":6.76,"dx":5.834,"dy":3.421},{"city":"沖縄市","name":"城前町","zip":"904-0002","dist":6.81,"dx":3.75,"dy":5.677},{"city":"嘉手納町","name":"兼久","zip":"904-0205","dist":6.87,"dx":-1.902,"dy":6.594},{"city":"西原町","name":"小那覇","zip":"903-0103","dist":6.89,"dx":0.35,"dy":-6.867},{"city":"沖縄市","name":"八重島","zip":"904-0006","dist":6.99,"dx":2.818,"dy":6.382},{"city":"沖縄市","name":"越来","zip":"904-0001","dist":7.05,"dx":3.473,"dy":6.127},{"city":"沖縄市","name":"桃原","zip":"904-2164","dist":7.07,"dx":5.171,"dy":4.825},{"city":"沖縄市","name":"宮里","zip":"904-2165","dist":7.13,"dx":4.561,"dy":5.47},{"city":"西原町","name":"嘉手苅","zip":"903-0102","dist":7.14,"dx":-0.96,"dy":-7.06},{"city":"西原町","name":"幸地","zip":"903-0116","dist":7.16,"dx":-3.232,"dy":-6.384},{"city":"浦添市","name":"安波茶","zip":"901-2114","dist":7.25,"dx":-5.413,"dy":-4.818},{"city":"沖縄市","name":"海邦","zip":"904-2162","dist":7.3,"dx":5.868,"dy":4.34},{"city":"浦添市","name":"城間","zip":"901-2133","dist":7.37,"dx":-6.462,"dy":-3.553},{"city":"西原町","name":"小波津","zip":"903-0118","dist":7.5,"dx":-2.022,"dy":-7.206},{"city":"沖縄市","name":"美里","zip":"904-2153","dist":7.55,"dx":3.598,"dy":6.634},{"city":"浦添市","name":"経塚","zip":"901-2111","dist":7.62,"dx":-5.247,"dy":-5.516},{"city":"沖縄市","name":"東","zip":"904-2154","dist":7.67,"dx":4.699,"dy":6.053},{"city":"沖縄市","name":"古謝","zip":"904-2161","dist":7.85,"dx":5.827,"dy":5.263},{"city":"西原町","name":"与那城","zip":"903-0111","dist":7.88,"dx":-1.395,"dy":-7.739},{"city":"沖縄市","name":"美原","zip":"904-2155","dist":7.88,"dx":4.419,"dy":6.514},{"city":"浦添市","name":"屋富祖","zip":"901-2127","dist":7.92,"dx":-6.812,"dy":-4.054},{"city":"浦添市","name":"大平","zip":"901-2113","dist":7.95,"dx":-6.257,"dy":-4.909},{"city":"沖縄市","name":"古謝津嘉山町","zip":"904-2166","dist":7.95,"dx":5.393,"dy":5.842},{"city":"西原町","name":"安室","zip":"903-0113","dist":8.02,"dx":-2.11,"dy":-7.725},{"city":"西原町","name":"兼久","zip":"903-0104","dist":8.08,"dx":-0.757,"dy":-8.029},{"city":"沖縄市","name":"美里仲原町","zip":"904-2156","dist":8.18,"dx":5.164,"dy":6.339},{"city":"嘉手納町","name":"水釜","zip":"904-0204","dist":8.21,"dx":-3.042,"dy":7.614},{"city":"沖縄市","name":"海邦町","zip":"904-2162","dist":8.25,"dx":6.988,"dy":4.4},{"city":"嘉手納町","name":"屋良","zip":"904-0202","dist":8.31,"dx":-1.092,"dy":8.221},{"city":"沖縄市","name":"松本","zip":"904-2151","dist":8.35,"dx":3.893,"dy":7.381},{"city":"西原町","name":"東崎","zip":"903-0105","dist":8.38,"dx":-0.256,"dy":-8.365},{"city":"西原町","name":"我謝","zip":"903-0112","dist":8.4,"dx":-1.734,"dy":-8.209},{"city":"西原町","name":"池田","zip":"903-0115","dist":8.4,"dx":-3.423,"dy":-7.659},{"city":"西原町","name":"桃原","zip":"903-0114","dist":8.5,"dx":-2.619,"dy":-8.077},{"city":"浦添市","name":"宮城","zip":"901-2126","dist":8.52,"dx":-7.118,"dy":-4.683},{"city":"嘉手納町","name":"嘉手納","zip":"904-0203","dist":8.53,"dx":-2.1,"dy":8.256},{"city":"うるま市","name":"江洲","zip":"904-2244","dist":8.58,"dx":5.669,"dy":6.436},{"city":"浦添市","name":"沢岻","zip":"901-2112","dist":8.63,"dx":-6.36,"dy":-5.827},{"city":"沖縄市","name":"明道","zip":"904-2152","dist":8.78,"dx":4.768,"dy":7.362},{"city":"沖縄市","name":"知花","zip":"904-2143","dist":8.96,"dx":3.549,"dy":8.21},{"city":"浦添市","name":"仲西","zip":"901-2125","dist":8.98,"dx":-7.681,"dy":-4.653},{"city":"読谷村","name":"古堅","zip":"904-0314","dist":9.09,"dx":-2.71,"dy":8.662},{"city":"うるま市","name":"宮里","zip":"904-2243","dist":9.12,"dx":5.937,"dy":6.923},{"city":"浦添市","name":"内間","zip":"901-2121","dist":9.15,"dx":-7.197,"dy":-5.643},{"city":"読谷村","name":"比謝矼","zip":"904-0312","dist":9.19,"dx":-1.973,"dy":8.957},{"city":"うるま市","name":"赤道","zip":"904-2245","dist":9.31,"dx":5.271,"dy":7.668},{"city":"うるま市","name":"前原","zip":"904-2235","dist":9.32,"dx":7.353,"dy":5.731},{"city":"浦添市","name":"小湾","zip":"901-2124","dist":9.42,"dx":-8.274,"dy":-4.498},{"city":"うるま市","name":"州崎","zip":"904-2234","dist":9.42,"dx":7.866,"dy":5.195},{"city":"浦添市","name":"西洲","zip":"901-2123","dist":9.44,"dx":-8.538,"dy":-4.049},{"city":"読谷村","name":"渡具知","zip":"904-0315","dist":9.5,"dx":-3.664,"dy":8.748},{"city":"うるま市","name":"高江洲","zip":"904-2242","dist":9.64,"dx":6.581,"dy":7.04},{"city":"浦添市","name":"勢理客","zip":"901-2122","dist":9.66,"dx":-8.141,"dy":-5.196},{"city":"読谷村","name":"大湾","zip":"904-0313","dist":9.89,"dx":-2.828,"dy":9.464},{"city":"うるま市","name":"豊原","zip":"904-2233","dist":10.01,"dx":7.674,"dy":6.433},{"city":"沖縄市","name":"登川","zip":"904-2142","dist":10.09,"dx":4.498,"dy":9.019},{"city":"読谷村","name":"比謝","zip":"904-0311","dist":10.17,"dx":-2.164,"dy":9.917},{"city":"うるま市","name":"喜仲","zip":"904-2236","dist":10.17,"dx":6.984,"dy":7.39},{"city":"うるま市","name":"塩屋","zip":"904-2231","dist":10.57,"dx":8.366,"dy":6.461},{"city":"うるま市","name":"喜屋武","zip":"904-2225","dist":10.71,"dx":7.25,"dy":7.874},{"city":"読谷村","name":"大木","zip":"904-0316","dist":10.73,"dx":-2.946,"dy":10.305},{"city":"うるま市","name":"仲嶺","zip":"904-2226","dist":10.86,"dx":7.703,"dy":7.657},{"city":"うるま市","name":"兼箇段","zip":"904-2241","dist":10.92,"dx":6.225,"dy":8.965},{"city":"嘉手納町","name":"久得","zip":"904-0201","dist":11.03,"dx":0.413,"dy":11.004},{"city":"読谷村","name":"楚辺","zip":"904-0304","dist":11.03,"dx":-3.938,"dy":10.288},{"city":"うるま市","name":"川田","zip":"904-2232","dist":11.05,"dx":9.059,"dy":6.335},{"city":"読谷村","name":"伊良皆","zip":"904-0303","dist":11.08,"dx":-2.097,"dy":10.86},{"city":"うるま市","name":"上江洲","zip":"904-2222","dist":11.22,"dx":8.23,"dy":7.632},{"city":"うるま市","name":"勝連南風原","zip":"904-2311","dist":11.28,"dx":10.203,"dy":4.836},{"city":"浦添市","name":"伊奈武瀬","zip":"901-2128","dist":11.29,"dx":-10.329,"dy":-4.563},{"city":"沖縄市","name":"倉敷","zip":"904-2145","dist":11.3,"dx":1.996,"dy":11.1},{"city":"うるま市","name":"平良川","zip":"904-2221","dist":11.43,"dx":7.41,"dy":8.703},{"city":"うるま市","name":"大田","zip":"904-2224","dist":11.48,"dx":9.015,"dy":7.112},{"city":"沖縄市","name":"池原","zip":"904-2141","dist":11.65,"dx":5.045,"dy":10.491},{"city":"うるま市","name":"西原","zip":"904-2204","dist":11.73,"dx":6.831,"dy":9.527},{"city":"うるま市","name":"与那城西原","zip":"904-2302","dist":11.99,"dx":11.099,"dy":4.552},{"city":"うるま市","name":"具志川","zip":"904-2223","dist":12.08,"dx":9.641,"dy":7.277},{"city":"うるま市","name":"勝連平安名","zip":"904-2312","dist":12.08,"dx":11.701,"dy":3.05},{"city":"うるま市","name":"安慶名","zip":"904-2214","dist":12.32,"dx":7.627,"dy":9.666},{"city":"読谷村","name":"都屋","zip":"904-0305","dist":12.34,"dx":-4.94,"dy":11.289},{"city":"うるま市","name":"与那城照間","zip":"904-2301","dist":12.37,"dx":11.097,"dy":5.481},{"city":"うるま市","name":"川崎","zip":"904-2203","dist":12.38,"dx":6.656,"dy":10.422},{"city":"読谷村","name":"喜名","zip":"904-0302","dist":12.44,"dx":-0.855,"dy":12.386},{"city":"うるま市","name":"田場","zip":"904-2213","dist":12.45,"dx":8.859,"dy":8.748},{"city":"うるま市","name":"与那城","zip":"904-2303","dist":12.64,"dx":11.895,"dy":4.324},{"city":"うるま市","name":"勝連内間","zip":"904-2313","dist":12.8,"dx":12.511,"dy":2.774},{"city":"うるま市","name":"栄野比","zip":"904-2205","dist":12.8,"dx":5.664,"dy":11.465},{"city":"うるま市","name":"みどり町","zip":"904-2215","dist":12.85,"dx":8.187,"dy":9.895},{"city":"うるま市","name":"石川楚南","zip":"904-1112","dist":12.89,"dx":3.682,"dy":12.333},{"city":"読谷村","name":"座喜味","zip":"904-0301","dist":12.96,"dx":-2.793,"dy":12.634},{"city":"うるま市","name":"赤野","zip":"904-2212","dist":13.03,"dx":8.99,"dy":9.422},{"city":"うるま市","name":"与那城安勢理","zip":"904-2306","dist":13.29,"dx":12.982,"dy":2.925},{"city":"読谷村","name":"上地","zip":"904-0321","dist":13.36,"dx":-3.795,"dy":12.787},{"city":"読谷村","name":"波平","zip":"904-0322","dist":13.38,"dx":-4.989,"dy":12.4},{"city":"うるま市","name":"与那城屋慶名","zip":"904-2304","dist":13.55,"dx":12.995,"dy":3.869},{"city":"うるま市","name":"与那城中央","zip":"904-2305","dist":13.71,"dx":12.995,"dy":4.415},{"city":"うるま市","name":"勝連平敷屋","zip":"904-2314","dist":13.76,"dx":13.674,"dy":1.661},{"city":"うるま市","name":"昆布","zip":"904-2201","dist":13.78,"dx":7.047,"dy":11.822},{"city":"うるま市","name":"天願","zip":"904-2202","dist":13.94,"dx":8.322,"dy":11.175},{"city":"うるま市","name":"宇堅","zip":"904-2211","dist":13.97,"dx":9.504,"dy":10.231},{"city":"うるま市","name":"与那城饒辺","zip":"904-2307","dist":14.02,"dx":13.767,"dy":2.738},{"city":"うるま市","name":"石川山城","zip":"904-1113","dist":14.03,"dx":2.865,"dy":13.716},{"city":"読谷村","name":"高志保","zip":"904-0323","dist":14.22,"dx":-4.871,"dy":13.34},{"city":"うるま市","name":"石川東恩納","zip":"904-1111","dist":14.25,"dx":5.501,"dy":13.121},{"city":"読谷村","name":"長浜","zip":"904-0324","dist":14.58,"dx":-3.704,"dy":14.081},{"city":"うるま市","name":"石川嘉手苅","zip":"904-1114","dist":15.09,"dx":3.199,"dy":14.724},{"city":"うるま市","name":"石川曙","zip":"904-1107","dist":15.22,"dx":5.111,"dy":14.318},{"city":"読谷村","name":"渡慶次","zip":"904-0326","dist":15.3,"dx":-4.941,"dy":14.459},{"city":"読谷村","name":"儀間","zip":"904-0327","dist":15.32,"dx":-5.685,"dy":14.208},{"city":"うるま市","name":"石川東恩納崎","zip":"904-1108","dist":15.44,"dx":6.185,"dy":14.128},{"city":"うるま市","name":"石川伊波","zip":"904-1115","dist":15.55,"dx":3.568,"dy":15.115},{"city":"読谷村","name":"瀬名波","zip":"904-0325","dist":15.85,"dx":-4.619,"dy":15.134},{"city":"うるま市","name":"与那城屋平","zip":"904-2427","dist":16.03,"dx":15.349,"dy":4.697},{"city":"うるま市","name":"石川白浜","zip":"904-1105","dist":16.17,"dx":5.193,"dy":15.289},{"city":"うるま市","name":"石川石崎","zip":"904-1104","dist":16.33,"dx":5.438,"dy":15.378},{"city":"うるま市","name":"石川","zip":"904-1106","dist":16.46,"dx":4.838,"dy":15.709},{"city":"読谷村","name":"宇座","zip":"904-0328","dist":16.82,"dx":-5.36,"dy":15.921},{"city":"うるま市","name":"石川赤崎","zip":"904-1103","dist":16.95,"dx":6.2,"dy":15.753},{"city":"うるま市","name":"勝連津堅","zip":"904-2317","dist":17.14,"dx":16.642,"dy":-4.142},{"city":"うるま市","name":"石川東山本町","zip":"904-1101","dist":17.27,"dx":5.676,"dy":16.286},{"city":"うるま市","name":"石川東山","zip":"904-1102","dist":17.55,"dx":6.209,"dy":16.393},{"city":"うるま市","name":"勝連浜","zip":"904-2315","dist":18.11,"dx":17.785,"dy":3.503},{"city":"うるま市","name":"勝連比嘉","zip":"904-2316","dist":18.65,"dx":18.393,"dy":3.209},{"city":"うるま市","name":"与那城平安座","zip":"904-2426","dist":19.05,"dx":17.849,"dy":6.701},{"city":"うるま市","name":"与那城平宮","zip":"904-2428","dist":20.38,"dx":19.112,"dy":7.14},{"city":"うるま市","name":"与那城桃原","zip":"904-2425","dist":21.43,"dx":20.038,"dy":7.662},{"city":"うるま市","name":"与那城上原","zip":"904-2424","dist":22.09,"dx":20.187,"dy":9.026},{"city":"うるま市","name":"与那城宮城","zip":"904-2423","dist":23,"dx":21.349,"dy":8.62},{"city":"うるま市","name":"与那城池味","zip":"904-2422","dist":23.24,"dx":21.043,"dy":9.903},{"city":"うるま市","name":"与那城伊計","zip":"904-2421","dist":24.67,"dx":21.943,"dy":11.327}];
+
+
+/* 拠点（普天間）から近い順の市町村表示順 */
+const CITY_ORDER=["宜野湾市","北中城村","中城村","北谷町","西原町","浦添市","沖縄市","嘉手納町","読谷村","うるま市"];
+
+/* ---- State ---- */
+let northKm=5, southKm=5, eastKm=5, westKm=5;
+
+/* ---- Quick buttons ---- */
+const QUICK=[3,5,7,10];
+const qwrap=document.getElementById('quick');
+QUICK.forEach(v=>{
+  const b=document.createElement('button');
+  b.textContent=v+'km'; b.dataset.v=v;
+  b.onclick=()=>{
+    northKm=southKm=eastKm=westKm=v;
+    ['north','south','east','west'].forEach(dir=>document.getElementById('sl-'+dir).value=v);
+    render();
+  };
+  qwrap.appendChild(b);
+});
+
+/* ---- MAP setup (Leaflet + OpenStreetMap) ---- */
+/* DATA の dx/dy 変換用（Geolonia 普天間2丁目 centroid 基準） */
+const CENTER_LAT=26.289427, CENTER_LNG=127.775457;
+const KM_LAT=111.0, KM_LNG=111.32*Math.cos(CENTER_LAT*Math.PI/180);
+function toLL(d){return[CENTER_LAT+d.dy/KM_LAT, CENTER_LNG+d.dx/KM_LNG];}
+
+/* 実際の拠点住所（可変） */
+let HOME_LAT=26.288713, HOME_LNG=127.77771;
+
+/* 現在の HOME からの各エントリのオフセットと距離 */
+function entryOffsets(d){
+  const eLat=CENTER_LAT+d.dy/KM_LAT, eLng=CENTER_LNG+d.dx/KM_LNG;
+  const dx=(eLng-HOME_LNG)*KM_LNG, dy=(eLat-HOME_LAT)*KM_LAT;
+  return{dx,dy,dist:Math.sqrt(dx*dx+dy*dy)};
+}
+function isInside(d){
+  const{dx,dy}=entryOffsets(d);
+  return dy<=northKm&&dy>=-southKm&&dx<=eastKm&&dx>=-westKm;
+}
+function getRectBounds(){
+  return[[HOME_LAT-southKm/KM_LAT,HOME_LNG-westKm/KM_LNG],
+         [HOME_LAT+northKm/KM_LAT,HOME_LNG+eastKm/KM_LNG]];
+}
+
+const lmap=L.map('map').setView([HOME_LAT,HOME_LNG],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:18,
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(lmap);
+
+/* 拠点マーカー */
+const homeIcon=L.divIcon({className:'home-icon',html:'<div></div>',iconSize:[14,14],iconAnchor:[7,7]});
+const homeMarker=L.marker([HOME_LAT,HOME_LNG],{icon:homeIcon})
+  .bindPopup('<b>なんデリ拠点</b><br>普天間2-12-1').addTo(lmap);
+
+/* 配達エリアサークル（4方向の平均半径） */
+const radCircle=L.circle([HOME_LAT,HOME_LNG],{
+  radius:(northKm+southKm+eastKm+westKm)/4*1000,
+  color:'#00a3b4',fillColor:'#00a3b4',
+  fillOpacity:0.07,dashArray:'6 4',weight:2
+}).addTo(lmap);
+
+/* 町域マーカー */
+const markers=DATA.map(d=>{
+  const marker=L.circleMarker(toLL(d),{
+    radius:4,color:'#c6cdcc',fillColor:'#c6cdcc',fillOpacity:0.5,weight:1.5
+  }).addTo(lmap);
+  return{marker,d};
+});
+
+/* ---- 住所ジオコーディング（国土地理院） ---- */
+async function geocodeAddress(address){
+  const url='https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(address);
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('通信エラー');
+  const data=await res.json();
+  if(!data||!data.length) throw new Error('住所が見つかりません');
+  const[lng,lat]=data[0].geometry.coordinates;
+  return{lat,lng,name:data[0].properties.title};
+}
+
+document.getElementById('addr-btn').addEventListener('click',async function(){
+  const input=document.getElementById('addr-input');
+  const status=document.getElementById('addr-status');
+  const address=input.value.trim();
+  if(!address) return;
+  this.disabled=true; this.textContent='検索中…';
+  status.textContent=''; status.className='addr-status';
+  try{
+    const{lat,lng,name}=await geocodeAddress(address);
+    HOME_LAT=lat; HOME_LNG=lng;
+    homeMarker.setLatLng([lat,lng]);
+    homeMarker.setPopupContent('<b>なんデリ拠点</b><br>'+name);
+    lmap.setView([lat,lng],lmap.getZoom());
+    document.querySelector('.addr').innerHTML='配達拠点 <b>'+name+'</b> ／ 拠点からの直線距離ベース';
+    status.textContent='✓ '+name+' ('+lat.toFixed(5)+', '+lng.toFixed(5)+')';
+    status.className='addr-status ok';
+    render();
+  }catch(e){
+    status.textContent='⚠ '+e.message;
+    status.className='addr-status err';
+  }finally{
+    this.disabled=false; this.textContent='設定';
+  }
+});
+
+/* ---- render ---- */
+function updateSliderBg(id,val){
+  const el=document.getElementById(id);
+  el.style.backgroundSize=((val-0.5)/14.5*100)+'% 100%';
+}
+function render(){
+  updateSliderBg('sl-north',northKm); document.getElementById('v-north').textContent=northKm.toFixed(1)+'km';
+  updateSliderBg('sl-south',southKm); document.getElementById('v-south').textContent=southKm.toFixed(1)+'km';
+  updateSliderBg('sl-east', eastKm);  document.getElementById('v-east').textContent=eastKm.toFixed(1)+'km';
+  updateSliderBg('sl-west', westKm);  document.getElementById('v-west').textContent=westKm.toFixed(1)+'km';
+  qwrap.querySelectorAll('button').forEach(b=>{
+    const v=parseFloat(b.dataset.v);
+    b.classList.toggle('on',northKm===v&&southKm===v&&eastKm===v&&westKm===v);
+  });
+  radCircle.setLatLng([HOME_LAT,HOME_LNG]);
+  radCircle.setRadius((northKm+southKm+eastKm+westKm)/4*1000);
+
+  const inside=DATA.filter(isInside);
+  const showLab=document.getElementById('lbtoggle').checked;
+  markers.forEach(({marker,d})=>{
+    const on=isInside(d);
+    const{dist}=entryOffsets(d);
+    marker.setStyle({
+      color:on?'#00a3b4':'#c6cdcc',
+      fillColor:on?'#00a3b4':'#c6cdcc',
+      fillOpacity:on?0.85:0.35,
+      radius:on?6:4
+    });
+    marker.unbindTooltip();
+    const tipTxt='<b>'+d.city+'</b> '+d.name+' '+d.zip+' / '+dist.toFixed(1)+'km';
+    if(on&&showLab){
+      marker.bindTooltip(d.name,{permanent:true,direction:'right',className:'map-name-tip'});
+    }else{
+      marker.bindTooltip(tipTxt,{permanent:false,direction:'top'});
+    }
+  });
+
+  /* stats */
+  document.getElementById('s-area').textContent=inside.length;
+  const cset=new Set(inside.map(d=>d.city));
+  document.getElementById('s-city').textContent=cset.size;
+  const maxDist=inside.length?Math.max(...inside.map(d=>entryOffsets(d).dist)):0;
+  document.getElementById('s-far').textContent=maxDist?maxDist.toFixed(1):'0';
+
+  /* list grouped */
+  const list=document.getElementById('list'); list.innerHTML='';
+  if(!inside.length){list.innerHTML='<div class="empty">この設定では該当地域がありません</div>';}
+  const byCity={};
+  inside.forEach(d=>{(byCity[d.city]=byCity[d.city]||[]).push(d);});
+  const order=CITY_ORDER.filter(c=>byCity[c]);
+  order.forEach(city=>{
+    const arr=byCity[city].sort((a,b)=>entryOffsets(a).dist-entryOffsets(b).dist);
+    const blk=document.createElement('div'); blk.className='cityblock';
+    blk.innerHTML='<div class="cityname"><b>'+city+'</b><span>'+arr.length+'</span></div>'+
+      arr.map(d=>{const{dist}=entryOffsets(d);
+        return'<div class="row"><span class="nm">'+d.name+
+          '</span><span class="zp">'+d.zip+'</span><span class="ds">'+
+          dist.toFixed(1)+'</span></div>';
+      }).join('');
+    list.appendChild(blk);
+  });
+  document.getElementById('listcnt').textContent=inside.length+'地名 / '+cset.size+'市町村';
+  document.getElementById('incity').textContent='圏内 '+inside.length+'地名';
+  window._inside=inside;
+}
+
+/* ---- copy / export ---- */
+function flash(btn,txt){
+  const o=btn.textContent, c=btn.className;
+  btn.textContent=txt; btn.classList.add('done');
+  setTimeout(()=>{btn.textContent=o;btn.className=c;},1300);
+}
+document.getElementById('cp-zip').onclick=function(){
+  const z=window._inside.map(d=>d.zip.replace('-','')).join('\n');
+  navigator.clipboard.writeText(z).then(()=>flash(this,'コピーしました ✓'));
+};
+document.getElementById('cp-list').onclick=function(){
+  const t=window._inside.map(d=>d.city+' '+d.name+' '+d.zip).join('\n');
+  navigator.clipboard.writeText(t).then(()=>flash(this,'コピーしました ✓'));
+};
+document.getElementById('dl-csv').onclick=function(){
+  let csv='市町村,地名,郵便番号,郵便番号7桁,直線距離km\n';
+  window._inside.forEach(d=>{
+    const{dist}=entryOffsets(d);
+    csv+=[d.city,d.name,d.zip,d.zip.replace('-',''),dist.toFixed(2)].join(',')+'\n';
+  });
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='なんデリ配達エリア_N'+northKm+'S'+southKm+'E'+eastKm+'W'+westKm+'km.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+  flash(this,'ダウンロード ✓');
+};
+
+['north','south','east','west'].forEach(dir=>{
+  document.getElementById('sl-'+dir).addEventListener('input',e=>{
+    const v=parseFloat(e.target.value);
+    if(dir==='north') northKm=v;
+    else if(dir==='south') southKm=v;
+    else if(dir==='east') eastKm=v;
+    else westKm=v;
+    render();
+  });
+});
+document.getElementById('lbtoggle').addEventListener('change',render);
+render();
+</script>
+</body>
+</html>
