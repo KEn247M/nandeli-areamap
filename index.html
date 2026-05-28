@@ -264,6 +264,17 @@ function getRectBounds(){
   return[[HOME_LAT-southKm/KM_LAT,HOME_LNG-westKm/KM_LNG],
          [HOME_LAT+northKm/KM_LAT,HOME_LNG+eastKm/KM_LNG]];
 }
+/* 各象限を楕円弧で繋いだ方向別エリアポリゴン */
+function createAreaPolygon(){
+  const nD=northKm/KM_LAT, sD=southKm/KM_LAT;
+  const eD=eastKm/KM_LNG,  wD=westKm/KM_LNG;
+  const pts=[], S=48;
+  for(let i=0;i<=S;i++){const t=i/S*Math.PI/2; pts.push([HOME_LAT+nD*Math.cos(t), HOME_LNG+eD*Math.sin(t)]);}
+  for(let i=1;i<=S;i++){const t=i/S*Math.PI/2; pts.push([HOME_LAT-sD*Math.sin(t), HOME_LNG+eD*Math.cos(t)]);}
+  for(let i=1;i<=S;i++){const t=i/S*Math.PI/2; pts.push([HOME_LAT-sD*Math.cos(t), HOME_LNG-wD*Math.sin(t)]);}
+  for(let i=1;i<=S;i++){const t=i/S*Math.PI/2; pts.push([HOME_LAT+nD*Math.sin(t), HOME_LNG-wD*Math.cos(t)]);}
+  return pts;
+}
 
 const lmap=L.map('map').setView([HOME_LAT,HOME_LNG],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -276,9 +287,8 @@ const homeIcon=L.divIcon({className:'home-icon',html:'<div></div>',iconSize:[14,
 const homeMarker=L.marker([HOME_LAT,HOME_LNG],{icon:homeIcon})
   .bindPopup('<b>なんデリ拠点</b><br>普天間2-12-1').addTo(lmap);
 
-/* 配達エリアサークル（4方向の平均半径） */
-const radCircle=L.circle([HOME_LAT,HOME_LNG],{
-  radius:(northKm+southKm+eastKm+westKm)/4*1000,
+/* 配達エリア（方向別ポリゴン） */
+const radShape=L.polygon(createAreaPolygon(),{
   color:'#00a3b4',fillColor:'#00a3b4',
   fillOpacity:0.07,dashArray:'6 4',weight:2
 }).addTo(lmap);
@@ -341,8 +351,7 @@ function render(){
     const v=parseFloat(b.dataset.v);
     b.classList.toggle('on',northKm===v&&southKm===v&&eastKm===v&&westKm===v);
   });
-  radCircle.setLatLng([HOME_LAT,HOME_LNG]);
-  radCircle.setRadius((northKm+southKm+eastKm+westKm)/4*1000);
+  radShape.setLatLngs(createAreaPolygon());
 
   const inside=DATA.filter(isInside);
   const showLab=document.getElementById('lbtoggle').checked;
